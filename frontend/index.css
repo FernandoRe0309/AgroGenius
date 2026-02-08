@@ -1,0 +1,14 @@
+@import "tailwindcss";
+/* Estilos base para AgroGenius */
+:root {
+  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  background-color: #f9fafb;
+  color: #999;
+  display: flex;
+  justify-content: center;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
