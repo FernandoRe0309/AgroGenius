@@ -1,0 +1,14 @@
+// Ejemplo: Enviar notificación diaria
+const cron = require('node-cron');
+
+cron.schedule('0 9 * * *', async () => {
+    // Enviar recordatorio diario
+    const [users] = await pool.execute(
+        'SELECT phone, name FROM users_whatsapp WHERE status = "active"'
+    );
+    
+    for (const user of users) {
+        await sendWhatsAppMessage(user.phone, 
+            `Buenos días ${user.name}. ¡No olvides revisar tus tareas de hoy!`);
+    }
+});

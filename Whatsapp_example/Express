@@ -1,0 +1,153 @@
+// 1. Instalar dependencias
+// npm install express mysql2 axios
+
+// 2. Configuración del servidor
+const express = require('express');
+const mysql = require('mysql2/promise');
+const axios = require('axios');
+require('dotenv').config();
+
+const app = express();
+app.use(express.json());
+
+// 3. Conexión a BD
+const pool = mysql.createPool({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASS,
+    database: process.env.DB_NAME
+});
+
+// 4. Configuración WhatsApp API
+const WHATSAPP_API = 'https://graph.facebook.com/v18.0';
+const ACCESS_TOKEN = process.env.WHATSAPP_TOKEN;
+const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+
+// 5. Endpoint para registrar números
+app.post('/api/register-number', async (req, res) => {
+    try {
+        const { phone, name, email } = req.body;
+        
+        // Validar formato: 5215512345678 (sin +)
+        const cleanPhone = phone.replace(/\D/g, '');
+        
+        // Guardar en BD
+        const [result] = await pool.execute(
+            'INSERT INTO users_whatsapp (phone, name, email, status) VALUES (?, ?, ?, "active")',
+            [cleanPhone, name, email]
+        );
+        
+        // Enviar mensaje de bienvenida
+        await sendWhatsAppMessage(cleanPhone, 
+            `¡Hola ${name}! Te has registrado exitosamente. Recibirás notificaciones importantes.`);
+        
+        res.json({ success: true, id: result.insertId });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 6. Función para enviar mensajes
+async function sendWhatsAppMessage(to, message) {
+    try {
+        const response = await axios.post(
+            `${WHATSAPP_API}/${PHONE_NUMBER_ID}/messages`,
+            {
+                messaging_product: "whatsapp",
+                recipient_type: "individual",
+                to: to,
+                type: "text",
+                text: { 
+                    body: message,
+                    preview_url: false 
+                }
+            },
+            {
+                headers: {
+                    'Authorization': `Bearer ${ACCESS_TOKEN}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+        
+        console.log('Mensaje enviado:', response.data);
+        return response.data;
+    } catch (error) {
+        console.error('Error enviando mensaje:', error.response?.data || error.message);
+        throw error;
+    }
+}
+
+// 7. Endpoint para enviar notificaciones por evento
+app.post('/api/send-notification', async (req, res) => {
+    try {
+        const { eventType, additionalData } = req.body;
+        
+        // Consultar usuarios que deben recibir la notificación
+        const [users] = await pool.execute(
+            'SELECT phone, name FROM users_whatsapp WHERE status = "active"'
+        );
+        
+        // Crear mensaje según el evento
+        let message = '';
+        switch(eventType) {
+            case 'new_order':
+                message = `🚚 Nueva orden procesada. ID: ${additionalData.orderId}`;
+                break;
+            case 'payment_confirmed':
+                message = `✅ Pago confirmado. Monto: $${additionalData.amount}`;
+                break;
+            case 'system_alert':
+                message = `⚠️ Alerta del sistema: ${additionalData.alert}`;
+                break;
+            default:
+                message = `📢 Notificación: ${additionalData.message}`;
+        }
+        
+        // Enviar a todos los usuarios
+        const results = [];
+        for (const user of users) {
+            try {
+                const personalizedMsg = `Hola ${user.name}, ${message}`;
+                const result = await sendWhatsAppMessage(user.phone, personalizedMsg);
+                results.push({ phone: user.phone, success: true });
+            } catch (error) {
+                results.push({ phone: user.phone, success: false, error: error.message });
+            }
+        }
+        
+        res.json({ 
+            event: eventType, 
+            sent: results.filter(r => r.success).length,
+            failed: results.filter(r => !r.success).length,
+            details: results 
+        });
+        
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 8. Webhook para recibir respuestas (opcional)
+app.post('/webhook/whatsapp', async (req, res) => {
+    const body = req.body;
+    
+    if (body.entry && body.entry[0].changes[0].value.messages) {
+        const message = body.entry[0].changes[0].value.messages[0];
+        const from = message.from; // Número que envió
+        const text = message.text.body;
+        
+        // Guardar respuesta en BD
+        await pool.execute(
+            'INSERT INTO whatsapp_messages (phone, message, direction) VALUES (?, ?, "incoming")',
+            [from, text]
+        );
+        
+        // Respuesta automática
+        await sendWhatsAppMessage(from, "Gracias por tu mensaje. Te atenderemos pronto.");
+    }
+    
+    res.sendStatus(200);
+});
+
+app.listen(3000, () => console.log('Servidor en puerto 3000'));

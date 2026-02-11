@@ -1,0 +1,74 @@
+1. Configuración Inicial
+A. Requisitos previos:
+Cuenta de WhatsApp Business (verificada)
+
+Meta Business Account
+
+Número de teléfono empresarial
+
+Acceso a WhatsApp Cloud API (gratis hasta 1,000 conversaciones/mes)
+
+
+2.Backend - API por WhatsApp
+Usando Node.js/Express
+
+
+3.Frontend - Formulario de registro
+
+4.Base de Datos MySQL
+
+
+5. Configuración de Meta Developers
+Pasos:
+Ve a Meta for Developers link: https://developers.facebook.com/
+
+Crea una app → Selecciona "Business"
+
+Agrega producto "WhatsApp"
+
+Obtén el Access Token
+
+Configura el Webhook URL
+
+Verifica el número telefónico
+
+
+6.Variables de entorno(.env)
+// Ejemplo: Enviar notificación diaria
+const cron = require('node-cron');
+
+cron.schedule('0 9 * * *', async () => {
+    // Enviar recordatorio diario
+    const [users] = await pool.execute(
+        'SELECT phone, name FROM users_whatsapp WHERE status = "active"'
+    );
+    
+    for (const user of users) {
+        await sendWhatsAppMessage(user.phone, 
+            `Buenos días ${user.name}. ¡No olvides revisar tus tareas de hoy!`);
+    }
+});
+
+8. Alternativas más simples
+A. Servicios de terceros:
+Twilio API for WhatsApp (más fácil de configurar)
+
+MessageBird
+
+Vonage
+B. Usando librerías:
+npm install whatsapp-web.js
+
+// Autenticación web (no recomendado para producción)
+const { Client } = require('whatsapp-web.js');
+
+Consideraciones importantes:
+Costo: WhatsApp Business API tiene costos después de 1,000 mensajes/mes
+
+Plantillas: Para mensajes automáticos iniciales, debes usar plantillas aprobadas por Meta
+
+Consentimiento: Los usuarios deben opt-in explícitamente
+
+Horarios: Respeta horarios locales para envío de mensajes
+
+Privacidad: Cumple con GDPR/LGPD
