@@ -1,8 +1,10 @@
 // src/pages/Dashboard.jsx
 import React from 'react';
 import { Thermometer, Droplets, Wind, AlertTriangle, CheckCircle2, Cpu, Wifi, ArrowUp, ArrowDown } from 'lucide-react';
+import HistoryChart from '../components/HistoryChart'; // <--- IMPORTAR
 
 export default function Dashboard() {
+  
   return (
     <div className="animate-fade-in space-y-6 md:space-y-8">
       
@@ -27,7 +29,9 @@ export default function Dashboard() {
         <SensorCard title="Humedad Aire" value="65" unit="%" icon={<Wind />} color="cyan" trend="0.0" isUp={null} />
         <SensorCard title="CO2 ppm" value="419" unit="" icon={<Wind />} color="purple" trend="+12" isUp={true} />
       </div>
-
+      <div className="w-full">
+        <HistoryChart />
+      </div>
       {/* GRID INFERIOR (Alertas y ML) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         
